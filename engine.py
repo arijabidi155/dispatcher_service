@@ -2,7 +2,7 @@ import datetime
 from firebase_config import db
 from routing import optimize_route
 from assignment import select_best_livreur
-from firebase_admin import firestore
+from firebase_admin import firestore 
 from google.cloud.firestore_v1.base_query import FieldFilter
 
 def evaluate_pickup_runs(depot_id):
@@ -13,7 +13,7 @@ def evaluate_pickup_runs(depot_id):
     if not db:
         return 0
         
-    orders_ref = db.collection('orders').where(filter=FieldFilter('status', '==', 'pending')).order_by('createdAt').limit(20)
+    orders_ref = db.collection('orders').where(filter=FieldFilter('status', '==', 'pending')).where(filter=FieldFilter('senderGovernorate', '==', depot_id)).order_by('createdAt').limit(20)
     orders = list(orders_ref.stream())
     
     if not orders:
