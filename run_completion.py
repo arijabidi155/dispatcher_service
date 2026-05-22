@@ -27,16 +27,47 @@ def complete_run_logic(run_id, driver_id):
     # Update Run to COMPLETED
     run_ref.update({'status': 'COMPLETED'})
     
-    # Update orders to at_destination_depot if it was a PICKUP run
+    # Update orders depending on their pickup / delivery status and exceptions
     batch = db.batch()
     if run_data.get('type') == 'PICKUP':
         for order_id in run_data.get('orderIds', []):
             order_ref = db.collection('orders').document(order_id)
-            batch.update(order_ref, {'status': 'at_destination_depot', 'assignedDriverId': None, 'currentRunId': None})
+            order_doc = order_ref.get()
+            if order_doc.exists:
+                order_status = order_doc.to_dict().get('status', 'pending')
+                if order_status != 'failed_pickup':
+                    # Successfully picked up, arrives at origin depot
+                    batch.update(order_ref, {
+                        'status': 'at_origin_depot', 
+                        'assignedDriverId': None, 
+                        'currentRunId': None,
+                        'liveTrackingEnabled': False
+                    })
+                else:
+                    # Failed pickup, clear current run and driver so merchant can reschedule
+                    batch.update(order_ref, {
+                        'assignedDriverId': None, 
+                        'currentRunId': None,
+                        'liveTrackingEnabled': False
+                    })
     elif run_data.get('type') == 'DELIVERY':
         for order_id in run_data.get('orderIds', []):
             order_ref = db.collection('orders').document(order_id)
-            batch.update(order_ref, {'status': 'delivered'})
+            order_doc = order_ref.get()
+            if order_doc.exists:
+                order_status = order_doc.to_dict().get('status', 'out_for_delivery')
+                if order_status != 'failed_delivery':
+                    # Successfully delivered
+                    batch.update(order_ref, {
+                        'status': 'delivered',
+                        'liveTrackingEnabled': False
+                    })
+                else:
+                    # Failed delivery, parcel returned to local destination depot
+                    batch.update(order_ref, {
+                        'status': 'at_destination_depot',
+                        'liveTrackingEnabled': False
+                    })
     batch.commit()
     
     # Increment completed runs

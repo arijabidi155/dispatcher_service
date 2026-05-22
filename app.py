@@ -5,6 +5,13 @@ from run_completion import complete_run_logic
 
 app = Flask(__name__)
 
+@app.route('/', methods=['GET'])
+def home_ping():
+    return jsonify({
+        "success": True, 
+        "message": "Dispatcher is awake and running!"
+    }), 200
+
 @app.route('/api/trigger-pickup-evaluation', methods=['POST'])
 def trigger_pickup():
     try:
