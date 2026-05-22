@@ -7,10 +7,7 @@ app = Flask(__name__)
 
 @app.route('/', methods=['GET'])
 def home_ping():
-    return jsonify({
-        "success": True, 
-        "message": "Dispatcher is awake and running!"
-    }), 200
+    return "OK", 200
 
 @app.route('/api/trigger-pickup-evaluation', methods=['POST'])
 def trigger_pickup():
