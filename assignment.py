@@ -16,7 +16,7 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     r = 6371 # Radius of earth in kilometers
     return c * r
 
-def select_best_livreur(depot_lat, depot_lng):
+def select_best_livreur(depot_id, depot_lat, depot_lng):
     """
     Finds all AVAILABLE drivers and scores them based on:
     distance_to_depot * 0.4 + idle_time * 0.3 + workload * 0.2 + rating * 0.1
@@ -25,11 +25,12 @@ def select_best_livreur(depot_lat, depot_lng):
     if not db:
         return None
 
-    # Fetch available drivers
+    # Fetch available drivers for this specific depot governorate
     drivers_ref = db.collection('users')\
         .where(filter=FieldFilter('role', '==', 'livreur'))\
         .where(filter=FieldFilter('status', '==', 'approved'))\
-        .where(filter=FieldFilter('livreurState', '==', 'AVAILABLE')).stream()
+        .where(filter=FieldFilter('livreurState', '==', 'AVAILABLE'))\
+        .where(filter=FieldFilter('governorate', '==', depot_id)).stream()
     
     drivers = []
     for doc in drivers_ref:
@@ -56,7 +57,7 @@ def select_best_livreur(depot_lat, depot_lng):
         d_lng = driver.get('lastLng')
         if d_lat and d_lng:
             dist = calculate_distance(depot_lat, depot_lng, d_lat, d_lng)
-        else:
+        else: 
             dist = MAX_DISTANCE_KM # Penalty for missing location
 
         # 2. Idle Time

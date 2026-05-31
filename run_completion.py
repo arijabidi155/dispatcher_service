@@ -1,5 +1,6 @@
 from firebase_config import db
 from engine import evaluate_delivery_runs
+from logistics_helper import update_order_status_and_index, send_customer_notification
 
 def complete_run_logic(run_id, driver_id):
     """
@@ -29,20 +30,31 @@ def complete_run_logic(run_id, driver_id):
     
     # Update orders depending on their pickup / delivery status and exceptions
     batch = db.batch()
+    notifications_to_send = []
+    
     if run_data.get('type') == 'PICKUP':
         for order_id in run_data.get('orderIds', []):
             order_ref = db.collection('orders').document(order_id)
             order_doc = order_ref.get()
             if order_doc.exists:
-                order_status = order_doc.to_dict().get('status', 'pending')
+                order_data = order_doc.to_dict()
+                order_status = order_data.get('status', 'pending')
                 if order_status != 'failed_pickup':
                     # Successfully picked up, arrives at origin depot
+                    update_order_status_and_index(batch, order_ref, order_data, 'at_origin_depot')
                     batch.update(order_ref, {
-                        'status': 'at_origin_depot', 
                         'assignedDriverId': None, 
                         'currentRunId': None,
                         'liveTrackingEnabled': False
                     })
+                    client_id = order_data.get('clientId')
+                    if client_id:
+                        notifications_to_send.append((
+                            client_id,
+                            'Mise à jour logistique',
+                            f"Votre colis a été réceptionné au dépôt de {order_data.get('senderGovernorate', 'départ')}.",
+                            order_id
+                        ))
                 else:
                     # Failed pickup, clear current run and driver so merchant can reschedule
                     batch.update(order_ref, {
@@ -55,20 +67,42 @@ def complete_run_logic(run_id, driver_id):
             order_ref = db.collection('orders').document(order_id)
             order_doc = order_ref.get()
             if order_doc.exists:
-                order_status = order_doc.to_dict().get('status', 'out_for_delivery')
+                order_data = order_doc.to_dict()
+                order_status = order_data.get('status', 'out_for_delivery')
                 if order_status != 'failed_delivery':
                     # Successfully delivered
+                    update_order_status_and_index(batch, order_ref, order_data, 'delivered')
                     batch.update(order_ref, {
-                        'status': 'delivered',
                         'liveTrackingEnabled': False
                     })
+                    client_id = order_data.get('clientId')
+                    if client_id:
+                        notifications_to_send.append((
+                            client_id,
+                            'Colis Livré ! 🎉',
+                            "Votre colis a été livré avec succès par notre livreur.",
+                            order_id
+                        ))
                 else:
                     # Failed delivery, parcel returned to local destination depot
+                    update_order_status_and_index(batch, order_ref, order_data, 'at_destination_depot')
                     batch.update(order_ref, {
-                        'status': 'at_destination_depot',
                         'liveTrackingEnabled': False
                     })
+                    client_id = order_data.get('clientId')
+                    if client_id:
+                        notifications_to_send.append((
+                            client_id,
+                            'Tentative de livraison échouée',
+                            f"La livraison a échoué. Le colis est retourné au dépôt de {order_data.get('recipientGovernorate', 'destination')}.",
+                            order_id
+                        ))
     batch.commit()
+    
+    # Dispatch all customer notifications asynchronously or in loop
+    for client_id, title, body, order_id in notifications_to_send:
+        send_customer_notification(client_id, title, body, order_id=order_id)
+
     
     # Increment completed runs
     completed_runs = driver_data.get('completedRunsSession', 0) + 1
