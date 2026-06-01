@@ -76,7 +76,9 @@ def complete_run_logic(run_id, driver_id):
                     # Successfully delivered
                     update_order_status_and_index(batch, order_ref, order_data, 'delivered')
                     batch.update(order_ref, {
-                        'liveTrackingEnabled': False
+                        'liveTrackingEnabled': False,
+                        'notificationSent': False,
+                        'notificationProcessing': False
                     })
                     client_id = order_data.get('clientId')
                     if client_id:
