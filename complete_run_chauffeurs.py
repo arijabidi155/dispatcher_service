@@ -29,6 +29,9 @@ def complete_chauffeur_run_logic(run_id, chauffeur_id):
         return False, "Run or Chauffeur not found"
         
     run_data = run_doc.to_dict()
+    if run_data.get('status') == 'COMPLETED':
+        return True, "Already completed"
+        
     chauffeur_data = chauffeur_doc.to_dict()
     run_type = run_data.get('type')
     

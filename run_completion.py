@@ -23,6 +23,9 @@ def complete_run_logic(run_id, driver_id):
         return False, "Run or Driver not found"
         
     run_data = run_doc.to_dict()
+    if run_data.get('status') == 'COMPLETED':
+        return True, "Already completed"
+        
     driver_data = driver_doc.to_dict()
     
     # Update Run to COMPLETED
