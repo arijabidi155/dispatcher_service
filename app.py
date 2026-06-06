@@ -155,15 +155,25 @@ def auto_complete_chauffeur_runs() -> int:
     return completed_count
 
 
+is_evaluating = False
+
 @app.route('/api/system-tick', methods=['POST'])
 def system_tick():
     """
     [ORCHESTRATEUR LOGISTIQUE GLOBAL]
     Déclenché toutes les 15 min par cron.
-    1. Clôture automatique sécurisée O(1) des tournées terminées.
-    2. Lancement des optimisations IA sur tous les dépôts et hubs (Livreurs et Chauffeurs).
+    Protégé par un verrou de concurrence global pour éviter les doubles exécutions.
     """
+    global is_evaluating
+    if is_evaluating:
+        return jsonify({
+            "success": False, 
+            "error": "Evaluation already in progress. Concurrency lock is active."
+        }), 429
+
     try:
+        is_evaluating = True
+        
         # 1. Clôture automatique
         drivers_completed = auto_complete_driver_runs()
         chauffeurs_completed = auto_complete_chauffeur_runs()
@@ -223,6 +233,8 @@ def system_tick():
 
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        is_evaluating = False
 
 
 if __name__ == "__main__":
