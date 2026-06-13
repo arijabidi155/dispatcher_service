@@ -103,6 +103,11 @@ def auto_complete_driver_runs() -> int:
         if not driver_id:
             continue
             
+        if run_type == 'PICKUP':
+            # Les tournées de type PICKUP doivent être clôturées manuellement par le livreur
+            # lorsqu'il arrive au dépôt pour éviter de marquer les colis reçus trop tôt.
+            continue
+            
         # Requête O(1) ultra-optimisée pour vérifier s'il reste des colis non traités
         target_status = 'assigned' if run_type == 'PICKUP' else 'out_for_delivery'
         unprocessed_query = (

@@ -40,18 +40,16 @@ def optimize_route(depot_coords, stops):
                 # No, the 'waypoints' array corresponds to the input coordinates.
                 # We need to sort by 'waypoint_index'.
                 
-                # Create a list of tuples: (original_stop_object, optimized_order_index)
-                ordered_stops_with_index = []
-                for i, stop in enumerate(stops):
-                    # +1 because the first coordinate was the depot
-                    optimized_idx = waypoints[i + 1]['waypoint_index'] 
-                    ordered_stops_with_index.append((optimized_idx, stop))
-                    
-                # Sort by the optimized index
-                ordered_stops_with_index.sort(key=lambda x: x[0])
+                # OSRM returns waypoints in the optimized order.
+                # waypoint_index indicates the index of the coordinate in the input list.
+                # Since the first input coordinate is the depot (index 0), stops are shifted by -1.
+                optimized_stops = []
+                for wp in waypoints:
+                    input_idx = wp['waypoint_index']
+                    if input_idx > 0:
+                        optimized_stops.append(stops[input_idx - 1])
                 
-                # Return the ordered list of stop IDs
-                return [item[1]['id'] for item in ordered_stops_with_index]
+                return [stop['id'] for stop in optimized_stops]
     except Exception as e:
         print(f"OSRM Error: {e}")
         
