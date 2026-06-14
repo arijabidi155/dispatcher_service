@@ -17,35 +17,29 @@ def optimize_route(depot_coords, stops):
         
     coords_str = ";".join(coords_list)
     
-    # Using public OSRM API for Driving TSP
-    url = f"http://router.project-osrm.org/trip/v1/driving/{coords_str}?source=first&destination=last&roundtrip=true&steps=false"
+    # Using public OSRM API for Driving TSP: start at first coordinate (depot), end at any optimal last stop, no roundtrip
+    url = f"http://router.project-osrm.org/trip/v1/driving/{coords_str}?source=first&destination=any&roundtrip=false&steps=false"
     
     try:
         response = requests.get(url, timeout=10)
         if response.status_code == 200:
             data = response.json()
             if data.get('code') == 'Ok':
-                # Parse the waypoints to get the optimized order
                 waypoints = data['waypoints']
-                # waypoints[0] is the source (depot). The rest are the stops.
-                # OSRM returns waypoints with a 'waypoint_index' mapping original index to optimized index
                 
-                # We want to re-order our original 'stops' list based on OSRM's optimization
-                # waypoints correspond to the input coordinates
-                # Skip the first waypoint (depot)
-                stop_waypoints = waypoints[1:]
+                # OSRM waypoints array is sorted by input coordinate index.
+                # waypoint_index is the optimized position of that input point inside the trip.
+                # Create a list of tuples: (input_index, optimized_index)
+                indexed_waypoints = []
+                for i, wp in enumerate(waypoints):
+                    indexed_waypoints.append((i, wp['waypoint_index']))
                 
-                # Sort the original stops based on the 'waypoint_index' of the returned waypoints
-                # Actually, the returned waypoints list is already in the *optimized* order?
-                # No, the 'waypoints' array corresponds to the input coordinates.
-                # We need to sort by 'waypoint_index'.
+                # Sort the list by optimized_index (waypoint_index)
+                indexed_waypoints.sort(key=lambda x: x[1])
                 
-                # OSRM returns waypoints in the optimized order.
-                # waypoint_index indicates the index of the coordinate in the input list.
-                # Since the first input coordinate is the depot (index 0), stops are shifted by -1.
+                # Re-order the original stops, skipping the depot (input_index 0)
                 optimized_stops = []
-                for wp in waypoints:
-                    input_idx = wp['waypoint_index']
+                for input_idx, opt_idx in indexed_waypoints:
                     if input_idx > 0:
                         optimized_stops.append(stops[input_idx - 1])
                 
