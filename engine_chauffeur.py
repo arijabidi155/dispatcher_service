@@ -65,8 +65,10 @@ DEPOT_REGISTRY = {
     'Gafsa':       {'lat': 34.4250, 'lng':  8.7842, 'central': 'Sfax Central Hub',   'name': 'Gafsa'},
 } 
 
+HUB_DEPOTS = {'Tunis', 'Sousse', 'Sfax'}
+
 CENTRAL_SATELLITES = {
-    cid: [did for did, d in DEPOT_REGISTRY.items() if d['central'] == cid and did != cid]
+    cid: [did for did, d in DEPOT_REGISTRY.items() if d['central'] == cid and did != cid and did not in HUB_DEPOTS]
     for cid in CENTRAL_REGISTRY
 }
 
@@ -349,13 +351,14 @@ def evaluate_inter_central_pickup(central_id: str) -> int:
     # ── Write Firestore ───────────────────────────────────────────────────────
     run_ref = db.collection('chauffeur_runs').document()
     run_ref.set({
-        'type':            'INTER_CENTRAL_PICKUP',
-        'triggerType':     trigger,
-        'status':          'pending',
-        'centralId':       central_id,
-        'chauffeurId':     chauffeur_id,
-        'driverId':        chauffeur_id,
-        'stops':           [central_id] + ordered_depot_ids + [central_id],
+        'type':              'INTER_CENTRAL_PICKUP',
+        'triggerType':       trigger,
+        'status':            'pending',
+        'currentStopIndex':  0,
+        'centralId':         central_id,
+        'chauffeurId':       chauffeur_id,
+        'driverId':          chauffeur_id,
+        'stops':             [central_id] + ordered_depot_ids + [central_id],
         'pickupPayloads':  pickup_payloads,
         'orderIds':        all_order_ids,
         'totalOrders':     len(all_order_ids),
@@ -591,6 +594,7 @@ def evaluate_inter_central_delivery(central_id: str) -> int:
         'type':               'INTER_CENTRAL_DELIVERY',
         'triggerType':        trigger,
         'status':             'pending',
+        'currentStopIndex':   0,
         'centralId':          central_id,
         'chauffeurId':        chauffeur_id,
         'driverId':           chauffeur_id,
@@ -748,6 +752,7 @@ def evaluate_central_tour(origin_central_id: str) -> int:
             'type':                 'CENTRAL_TOUR',
             'triggerType':          trigger,
             'status':               'pending',
+            'currentStopIndex':     0,
             'originCentral':        origin_central_id,
             'destCentral':          dest_central_id,
             'stops':                [origin_central_id, dest_central_id],
@@ -1068,6 +1073,7 @@ def evaluate_depot_tour(central_id: str) -> int:
         'type':               'DEPOT_TOUR',
         'triggerType':        trigger,
         'status':             'pending',
+        'currentStopIndex':   0,
         'centralId':          central_id,
         'chauffeurId':        chauffeur_id,
         'driverId':           chauffeur_id,
