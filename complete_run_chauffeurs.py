@@ -2,6 +2,7 @@ import datetime
 from firebase_config import db
 from firebase_admin import firestore
 from logistics_helper import update_order_status_and_index, send_customer_notification
+from google.cloud.firestore_v1.base_query import FieldFilter
 # Importation mte3 l-moteurs mte3ek bésh l-camionét dima tal9a khédma toul
 from engine_chauffeur import (
     evaluate_inter_central_pickup,
@@ -89,6 +90,28 @@ def complete_chauffeur_run_logic(run_id, chauffeur_id):
                             f"Votre colis est arrivé au dépôt de destination ({depot_id}).",
                             oid
                         ))
+        
+        # Notify local depot agents of inter-city deliveries drop-off count
+        for depot_id, order_ids in delivery_payloads.items():
+            count = len(order_ids)
+            if count > 0 and depot_id:
+                try:
+                    agents_ref = db.collection('users')\
+                                   .where(filter=FieldFilter('role', '==', 'agent_depot'))\
+                                   .where(filter=FieldFilter('governorate', '==', depot_id))\
+                                   .limit(1)
+                    agents = list(agents_ref.stream())
+                    if agents:
+                        agent_id = agents[0].id
+                        notifications_to_send.append((
+                            agent_id,
+                            'Nouveaux Colis Arrivés 📦',
+                            f"{count} colis de transport inter-villes ont été déposés au dépôt.",
+                            None
+                        ))
+                except Exception as ae:
+                    print(f"⚠️ Error querying depot agent for Chauffeur dropoff at {depot_id}: {ae}")
+
         # 2. Update Opportunistic Pickups (Ken lamm hājat fi thniwto)
         pickup_payloads = run_data.get('pickupPayloads', {})
         for depot_id, order_ids in pickup_payloads.items():
@@ -176,6 +199,28 @@ def complete_chauffeur_run_logic(run_id, chauffeur_id):
                             f"Votre colis est arrivé au dépôt de destination ({depot_id}).",
                             oid
                         ))
+        
+        # Notify local depot agents of inter-city deliveries drop-off count
+        for depot_id, order_ids in delivery_payloads.items():
+            count = len(order_ids)
+            if count > 0 and depot_id:
+                try:
+                    agents_ref = db.collection('users')\
+                                   .where(filter=FieldFilter('role', '==', 'agent_depot'))\
+                                   .where(filter=FieldFilter('governorate', '==', depot_id))\
+                                   .limit(1)
+                    agents = list(agents_ref.stream())
+                    if agents:
+                        agent_id = agents[0].id
+                        notifications_to_send.append((
+                            agent_id,
+                            'Nouveaux Colis Arrivés 📦',
+                            f"{count} colis de transport inter-villes ont été déposés au dépôt.",
+                            None
+                        ))
+                except Exception as ae:
+                    print(f"⚠️ Error querying depot agent for Chauffeur dropoff at {depot_id}: {ae}")
+
         pickup_payloads = run_data.get('pickupPayloads', {})
         for depot_id, order_ids in pickup_payloads.items():
             for oid in order_ids:

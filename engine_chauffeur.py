@@ -24,6 +24,7 @@ from firebase_config import db
 from chauffeur_assignment import select_best_chauffeur
 from firebase_admin import firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
+from logistics_helper import send_customer_notification
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Geography
@@ -383,6 +384,15 @@ def evaluate_inter_central_pickup(central_id: str) -> int:
         })
     batch.commit()
 
+    try:
+        send_customer_notification(
+            chauffeur_id,
+            'Nouvelle Mission Chauffeur 🚚',
+            'Une nouvelle tournée inter-hub vous a été assignée. Veuillez consulter votre timeline.'
+        )
+    except Exception as ne:
+        print(f"⚠️ Error sending chauffeur assignment notification: {ne}")
+
     print(f"[ICP] {run_ref.id} | {central_id} -> {ordered_depot_ids} -> {central_id} "
           f"| {len(all_order_ids)} orders | vol:{used_vol/MAX_VOLUME_CM3:.0%} "
           f"wt:{used_wt/MAX_WEIGHT_KG:.0%} | greedy:{greedy_extras}")
@@ -633,6 +643,15 @@ def evaluate_inter_central_delivery(central_id: str) -> int:
         })
     batch.commit()
 
+    try:
+        send_customer_notification(
+            chauffeur_id,
+            'Nouvelle Mission Chauffeur 🚚',
+            'Une nouvelle tournée inter-hub vous a été assignée. Veuillez consulter votre timeline.'
+        )
+    except Exception as ne:
+        print(f"⚠️ Error sending chauffeur assignment notification: {ne}")
+
     print(f"[ICD] {run_ref.id} | {central_id} -> {ordered_depot_ids} "
           f"| del:{len(all_delivery_oids)} pk:{len(all_pickup_oids)} "
           f"| opp:{opp_stops} returnToBase:{return_to_base}")
@@ -783,6 +802,15 @@ def evaluate_central_tour(origin_central_id: str) -> int:
                 'assignedDriverId': chauffeur_id,
             })
         batch.commit()
+
+        try:
+            send_customer_notification(
+                chauffeur_id,
+                'Nouvelle Mission Chauffeur 🚚',
+                'Une nouvelle tournée inter-hub vous a été assignée. Veuillez consulter votre timeline.'
+            )
+        except Exception as ne:
+            print(f"⚠️ Error sending chauffeur assignment notification: {ne}")
 
         runs_created += 1
         print(f"[CT] {run_ref.id} | {origin_central_id}->{dest_central_id} "
@@ -1111,6 +1139,15 @@ def evaluate_depot_tour(central_id: str) -> int:
             'assignedDriverId': chauffeur_id,
         })
     batch.commit()
+
+    try:
+        send_customer_notification(
+            chauffeur_id,
+            'Nouvelle Mission Chauffeur 🚚',
+            'Une nouvelle tournée inter-hub vous a été assignée. Veuillez consulter votre timeline.'
+        )
+    except Exception as ne:
+        print(f"⚠️ Error sending chauffeur assignment notification: {ne}")
 
     print(f"[DT] {run_ref.id} | {central_id} | stops:{ordered_depot_ids} "
           f"| del:{len(all_del_ids)} pk:{len(all_pk_ids)} opp:{opportunistic}")

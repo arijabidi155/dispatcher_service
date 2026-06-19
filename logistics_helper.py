@@ -2,7 +2,7 @@ import requests
 from firebase_admin import firestore
 from firebase_config import db
 
-RENDER_NOTIFY_URL = "https://notify-server-repo.onrender.com/send-notification"
+RENDER_NOTIFY_URL = "https://notify-server-25en.onrender.com/send-notification"
 
 def update_order_status_and_index(batch, order_ref, order_data, new_status, location_name=None):
     """

@@ -1,6 +1,7 @@
 from firebase_config import db
 from engine import evaluate_delivery_runs
 from logistics_helper import update_order_status_and_index, send_customer_notification
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 def complete_run_logic(run_id, driver_id):
     """
@@ -36,6 +37,8 @@ def complete_run_logic(run_id, driver_id):
     notifications_to_send = []
     
     if run_data.get('type') == 'PICKUP':
+        success_count = 0
+        depot_id = run_data.get('depotId')
         for order_id in run_data.get('orderIds', []):
             order_ref = db.collection('orders').document(order_id)
             order_doc = order_ref.get()
@@ -44,6 +47,7 @@ def complete_run_logic(run_id, driver_id):
                 order_status = order_data.get('status', 'pending')
                 if order_status != 'failed_pickup':
                     # Successfully picked up, arrives at origin depot
+                    success_count += 1
                     update_order_status_and_index(batch, order_ref, order_data, 'at_origin_depot')
                     batch.update(order_ref, {
                         'assignedDriverId': None, 
@@ -65,6 +69,31 @@ def complete_run_logic(run_id, driver_id):
                         'currentRunId': None,
                         'liveTrackingEnabled': False
                     })
+                    client_id = order_data.get('clientId')
+                    if client_id:
+                        notifications_to_send.append((
+                            client_id,
+                            'Tentative de retrait échouée',
+                            f"Le retrait de votre colis avec la référence #{order_id[:8].upper()} a échoué. Vous pouvez reprogrammer le retrait.",
+                            order_id
+                        ))
+        if success_count > 0 and depot_id:
+            try:
+                agents_ref = db.collection('users')\
+                               .where(filter=FieldFilter('role', '==', 'agent_depot'))\
+                               .where(filter=FieldFilter('governorate', '==', depot_id))\
+                               .limit(1)
+                agents = list(agents_ref.stream())
+                if agents:
+                    agent_id = agents[0].id
+                    notifications_to_send.append((
+                        agent_id,
+                        'Nouveaux Colis Arrivés 📦',
+                        f"{success_count} colis ont été déposés au dépôt.",
+                        None
+                    ))
+            except Exception as ae:
+                print(f"⚠️ Error querying depot agent for PICKUP run completion: {ae}")
     elif run_data.get('type') == 'DELIVERY':
         for order_id in run_data.get('orderIds', []):
             order_ref = db.collection('orders').document(order_id)
@@ -85,7 +114,7 @@ def complete_run_logic(run_id, driver_id):
                         notifications_to_send.append((
                             client_id,
                             'Colis Livré ! 🎉',
-                            "Votre colis a été livré avec succès par notre livreur.",
+                            f"Votre colis avec la référence #{order_id[:8].upper()} a été livré avec succès.",
                             order_id
                         ))
                 else:

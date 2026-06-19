@@ -5,6 +5,7 @@ from assignment import select_best_livreur
 from firebase_admin import firestore 
 from google.cloud.firestore_v1.base_query import FieldFilter
 from engine_chauffeur import DEPOT_REGISTRY
+from logistics_helper import send_customer_notification
 
 VAN_VOLUME_CM3 = 3_000_000
 
@@ -111,10 +112,16 @@ def evaluate_pickup_runs(depot_id):
             batch.update(order_ref, {
                 'status': 'assigned',
                 'currentRunId': run_ref.id,
-                'assignedDriverId': best_driver_id
+                'assignedDriverId': best_driver_id,
+                'pickupDriverId': best_driver_id
             })
         batch.commit()
         
+        try:
+            send_customer_notification(best_driver_id, 'Nouvelle Mission', 'Un nouveau run de ramassage (Collecte) vous a été assigné.')
+        except Exception as ne:
+            print(f"⚠️ Error sending assignment notification: {ne}")
+            
         runs_created += 1
         print(f"Created PICKUP Run {run_ref.id} assigned to {best_driver_id}.")
         
@@ -211,10 +218,16 @@ def evaluate_delivery_runs(depot_id):
             batch.update(order_ref, {
                 'status': 'out_for_delivery',
                 'currentRunId': run_ref.id,
-                'assignedDriverId': best_driver_id
+                'assignedDriverId': best_driver_id,
+                'deliveryDriverId': best_driver_id
             })
         batch.commit()
         
+        try:
+            send_customer_notification(best_driver_id, 'Nouvelle Mission', 'Un nouveau run de livraison vous a été assigné.')
+        except Exception as ne:
+            print(f"⚠️ Error sending assignment notification: {ne}")
+            
         runs_created += 1
         print(f"Created DELIVERY Run {run_ref.id} assigned to {best_driver_id}.")
         
