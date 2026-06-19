@@ -380,7 +380,7 @@ def evaluate_inter_central_pickup(central_id: str) -> int:
         })
     batch.commit()
 
-    print(f"[ICP] {run_ref.id} | {central_id} → {ordered_depot_ids} → {central_id} "
+    print(f"[ICP] {run_ref.id} | {central_id} -> {ordered_depot_ids} -> {central_id} "
           f"| {len(all_order_ids)} orders | vol:{used_vol/MAX_VOLUME_CM3:.0%} "
           f"wt:{used_wt/MAX_WEIGHT_KG:.0%} | greedy:{greedy_extras}")
     return 1
@@ -434,10 +434,10 @@ def evaluate_inter_central_delivery(central_id: str) -> int:
     orders_ref = (
         db.collection('orders')
         .where(filter=FieldFilter('status', '==', 'ready_to_deliver'))
-        .where(filter=FieldFilter('destinationCentral', '==', central_id))
-        .order_by('createdAt')
+        .where(filter=FieldFilter('destCentral', '==', central_id))
     )
     docs = list(orders_ref.stream())
+    docs.sort(key=lambda d: d.to_dict().get('createdAt') or datetime.datetime.min.replace(tzinfo=datetime.timezone.utc))
     if not docs:
         return 0
 
@@ -629,7 +629,7 @@ def evaluate_inter_central_delivery(central_id: str) -> int:
         })
     batch.commit()
 
-    print(f"[ICD] {run_ref.id} | {central_id} → {ordered_depot_ids} "
+    print(f"[ICD] {run_ref.id} | {central_id} -> {ordered_depot_ids} "
           f"| del:{len(all_delivery_oids)} pk:{len(all_pickup_oids)} "
           f"| opp:{opp_stops} returnToBase:{return_to_base}")
     return 1
@@ -726,7 +726,7 @@ def evaluate_central_tour(origin_central_id: str) -> int:
             origin_info['lat'], origin_info['lng'], run_type='CENTRAL_TOUR'
         )
         if not chauffeur_id:
-            print(f"[CT] No chauffeur: {origin_central_id}→{dest_central_id}")
+            print(f"[CT] No chauffeur: {origin_central_id}->{dest_central_id}")
             continue
 
         order_ids = [o[0] for o in batch_orders]
@@ -736,7 +736,7 @@ def evaluate_central_tour(origin_central_id: str) -> int:
             db.collection('orders')
             .where(filter=FieldFilter('status', '==', 'ready_to_deliver'))
             .where(filter=FieldFilter('senderCentral',      '==', dest_central_id))
-            .where(filter=FieldFilter('destinationCentral', '==', origin_central_id))
+            .where(filter=FieldFilter('destCentral',        '==', origin_central_id))
             .limit(50)
         )
         backhaul_docs       = list(backhaul_ref.stream())
@@ -780,7 +780,7 @@ def evaluate_central_tour(origin_central_id: str) -> int:
         batch.commit()
 
         runs_created += 1
-        print(f"[CT] {run_ref.id} | {origin_central_id}→{dest_central_id} "
+        print(f"[CT] {run_ref.id} | {origin_central_id}->{dest_central_id} "
               f"| vol:{vol_r:.0%} wt:{wt_r:.0%} wait:{wait_m:.0f}m "
               f"| backhaul_available:{backhaul_available}")
 
@@ -829,10 +829,10 @@ def complete_central_tour_outbound(run_id: str) -> dict:
         db.collection('orders')
         .where(filter=FieldFilter('status',               '==', 'ready_to_deliver'))
         .where(filter=FieldFilter('senderCentral',        '==', dest_central))
-        .where(filter=FieldFilter('destinationCentral',   '==', origin_central))
-        .order_by('createdAt')
+        .where(filter=FieldFilter('destCentral',          '==', origin_central))
     )
     backhaul_docs = list(backhaul_ref.stream())
+    backhaul_docs.sort(key=lambda d: d.to_dict().get('createdAt') or datetime.datetime.min.replace(tzinfo=datetime.timezone.utc))
 
     if not backhaul_docs:
         run_ref.update({'status': 'RETURNING', 'backhaulLoaded': False})
@@ -876,7 +876,7 @@ def complete_central_tour_outbound(run_id: str) -> dict:
         })
     batch.commit()
 
-    print(f"[CT-Backhaul] {run_id} | {dest_central}→{origin_central} "
+    print(f"[CT-Backhaul] {run_id} | {dest_central}->{origin_central} "
           f"| {len(backhaul_order_ids)} orders loaded "
           f"| vol:{bk_vol/MAX_VOLUME_CM3:.0%}")
     return {
@@ -911,10 +911,11 @@ def evaluate_depot_tour(central_id: str) -> int:
     delivery_docs = list(
         db.collection('orders')
         .where(filter=FieldFilter('status', '==', 'ready_to_deliver'))
-        .where(filter=FieldFilter('destinationCentral', '==', central_id))
-        .order_by('createdAt')
+        .where(filter=FieldFilter('destCentral', '==', central_id))
         .stream()
     )
+    # Sort in memory by createdAt
+    delivery_docs.sort(key=lambda d: d.to_dict().get('createdAt') or datetime.datetime.min.replace(tzinfo=datetime.timezone.utc))
     delivery_by_depot: dict[str, list] = {}
     oldest_time = None
     for doc in delivery_docs:
